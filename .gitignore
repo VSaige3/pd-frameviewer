@@ -1,0 +1,10 @@
+# ignore fdata
+fdata
+# ignore exe
+*.exe
+# vscode files
+.vscode
+# config
+*.dat
+old
+fdatas.zip

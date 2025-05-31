@@ -1,5 +1,6 @@
 #include "frameviewer.h"
 #include <dirent.h>
+#include <sys/stat.h>
 
 WINDOW *option_window, *viewer_window;
 complete_framedata *comp_fdata;
@@ -240,14 +241,20 @@ bool mainloop() {
                 return true;
             }
             char *options[0x40];
+            char path[0x40];
             int opt_count = 0;
             // read directory
             struct dirent *dir;
             DIR *d;
-            d = opendir(".");
+            snprintf(path, 0x40, "%s/", FDATA_PATH);
+            d = opendir(path);
+            size_t fdata_len = strlen(path);
+            struct stat file_stat;
             if (d) {
                 while (dir = readdir(d)) {
-                    if (strcmp(dir->d_name + dir->d_namlen - 5, "fdata") == 0) {
+                    strcpy(path + fdata_len, dir->d_name);
+                    stat(path, &file_stat);
+                    if (S_ISREG(file_stat.st_mode)) {
                         if (opt_count < 0x40) {
                             options[opt_count] = malloc(dir->d_namlen + 1);
                             strncpy(options[opt_count], dir->d_name, dir->d_namlen);
@@ -264,7 +271,8 @@ bool mainloop() {
             wclear(option_window);
             selected_option = run_selection(option_window, opt_per_row, row_spacing, options, opt_count, selected_option);
             // use this option to load stuff
-            comp_fdata = load_fdata_for_player(options[selected_option]);
+            snprintf(path, 0x40, "%s/%s", FDATA_PATH, options[selected_option]);
+            comp_fdata = load_fdata_for_player(path);
             if (!comp_fdata) return false;
             state = SELECTING_SKILL;
             return true;

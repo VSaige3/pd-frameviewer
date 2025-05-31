@@ -27,48 +27,48 @@ Use WASD to navigate menus, use space to select
 Notes
 ----------
 
-Although it is not very readable, as of now, DO NOT rename the fdata files, the way they're 
-identified is by the "_fdata" at the end. You can however rename the part before that.
+Anything in the "./fdata" directory is treated as an animation length file. Put the results of 
 Here is what each is:
 
-pc00a: Player
-pc01a: Edgar
-pc02a: Freia
-pc03a: Meister
-pc04a: Chunky
-pc05a: Cuff Button
-pc06a: pH
-pc07a: Know
-pc08a: Tsubutaki
-pc09a: JD
-pc10a: Sammah
+* pc00a: Player
+* pc01a: Edgar
+* pc02a: Freia
+* pc03a: Meister
+* pc04a: Chunky
+* pc05a: Cuff Button
+* pc06a: pH
+* pc07a: Know
+* pc08a: Tsubutaki
+* pc09a: JD
+* pc10a: Sammah
 
-enm00a: Ommato
-enm01a: Scoto
-enm02a: Claustro
-enm03a: Catoptro
-enm04a: Mechano
-enm05a: Gyne
-enm06a: Euroto
-enm07a: Hedono
-enm08a: Anthro
-enm09a: Andro
-enm10a: Vestio
-enm11a: Partheno
-enm12a: Guard
-enm13a: Ceno
-enm14a: Germano
-enm15a: Belono
+* enm00a: Ommato
+* enm01a: Scoto
+* enm02a: Claustro
+* enm03a: Catoptro
+* enm04a: Mechano
+* enm05a: Gyne
+* enm06a: Euroto
+* enm07a: Hedono
+* enm08a: Anthro
+* enm09a: Andro
+* enm10a: Vestio
+* enm11a: Partheno
+* enm12a: Guard
+* enm13a: Ceno
+* enm14a: Germano
+* enm15a: Belono
 
 Framescraper
 =============
 
 This tool is used to grab animation lengths from the alr files. Does not produce
-readable files, they are to be used with the framviewer.
+readable files, they are to be used with the framviewer. If you must know the format,
+they are just a list of packed floats representing the length of each animation.
 
 Usage
 -------------
 
 To use the scraper, drag any number of alr files over the executable, or run it with 
 them as command line arguments. Note that not every alr will work, only ones from "player/..."
-(these are the model files for playable characters).
+(these are the model files for playable characters). Then place these fdata files in the "./fdata" directory.

@@ -7,6 +7,7 @@
 #include <libgen.h>
 
 #define CONFIG_PATH "config.dat"
+#define FDATA_PATH  "./fdata"
 
 #define COLOR_PAIR_ERR 1
 #define COLOR_PAIR_SELECTED 2
