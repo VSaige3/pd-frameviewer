@@ -27,8 +27,8 @@ Use WASD to navigate menus, use space to select
 Notes
 ----------
 
-Anything in the "./fdata" directory is treated as an animation length file. Put the results of 
-Here is what each is:
+Anything in the "./fdata" directory is treated as an animation length file. Put the results of the scraper in here.
+Here is the character each file maps to:
 
 * pc00a: Player
 * pc01a: Edgar
