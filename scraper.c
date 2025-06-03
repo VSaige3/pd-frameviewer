@@ -1,7 +1,11 @@
 #include "scraper.h"
 float buf[0x100];
+// "C:\PhantomDust\Tools\framedata_scraper\scraper.exe"
 
 int main(int args, char **argv) {
+    float x = 1.0f;
+    unsigned int y = *(int *)&x;
+    printf("%X\n", y);
     if (args <= 1) {
         printf("too few arguments, usage:\nscraper.exe <path1> <path2> ...\n");
         return -1;
