@@ -8,6 +8,7 @@
 
 #define CONFIG_PATH "config.dat"
 #define FDATA_PATH  "./fdata"
+#define GSDATA_REL_PATH "/Data/gstorage/gsdata_en.dat"
 
 #define COLOR_PAIR_ERR 1
 #define COLOR_PAIR_SELECTED 2
@@ -65,8 +66,11 @@ uint16_t get_delay_for_prefab(complete_framedata *fdat, uint16_t prefab_index);
 uint16_t get_melee_end_frame_for_prefab(complete_framedata *fdat, uint16_t prefab_index);
 uint32_t get_num_skills(void *gsdata);
 complete_framedata *load_fdata_for_player(char *bin_fdata_path);
+bool load_durations_for_player(char *bin_fdata_path, complete_framedata *fdat);
 void create_formatted_skill_diplay(WINDOW *window, uint32_t skill_index, complete_framedata *fdata);
 void display_framedata(WINDOW *window, int y, int x, uint32_t skill_index, complete_framedata *fdata);
+void display_framedata_ex(WINDOW *window, int y, int x, uint32_t skill_index, complete_framedata *fdata, int g_dur, int a_dur);
+void create_and_display_char_deltas(WINDOW *window, uint32_t skill_index);
 bool get_text_for_skill(void *gsdata, uint32_t skill_index, char *name_out, char *desc_out);
 
 enum use_restrict get_use_restrict(void *gsdata, uint32_t skill_index);

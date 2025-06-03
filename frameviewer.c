@@ -1,12 +1,13 @@
 #include "frameviewer.h"
 #include <dirent.h>
 #include <sys/stat.h>
+#include <windows.h>
 
 WINDOW *option_window, *viewer_window;
 complete_framedata *comp_fdata;
 uint32_t selected_skill_index;
 enum skill_search_method default_search_method;
-char *gsdata_path;
+char *assets_path;
 bool skill_already_selected, char_already_selected;
 
 int main(int args, char **argv) {
@@ -31,7 +32,7 @@ enum skill_search_method get_search_method(char c) {
 
 void get_gsdata_path(char *our_dir) {
     char path[PATH_MAX + 1];
-    char *new_gsdat_path = malloc(PATH_MAX);
+    char *new_assets_path = malloc(PATH_MAX);
     strncpy(path, our_dir, PATH_MAX);
     strcat(path, "/");
     strcat(path, CONFIG_PATH);
@@ -50,19 +51,19 @@ void get_gsdata_path(char *our_dir) {
             printf("Successfully created config file\n");
         }
     }
-    if (!f_exist || fscanf(config, "%260s\n", new_gsdat_path) == EOF) {
-        printf("Missing or empty config file, enter path to gsdata: \n");
-        scanf("%260s", new_gsdat_path);
-        fprintf(config, "%s\n", new_gsdat_path);
+    if (!f_exist || fscanf(config, "%260s\n", new_assets_path) == EOF) {
+        printf("Missing or empty config file, enter path to Phantom Dust \"Assets\": \n");
+        scanf("%260s\n", new_assets_path);
+        fprintf(config, "%s\n", new_assets_path);
     }
 
     char method = ' ';
-    if (!f_exist || fscanf(config, "%c", &method) == EOF || !is_valid_search_method(method)) {
+    if (!f_exist || fscanf(config, "%c\n", &method) == EOF || !is_valid_search_method(method)) {
         bool bad_option = false;
         do {
             printf("Missing or empty skill search method (%c), enter one to continue (h for hex skill index, s for skill name): \n", method);
             char method;
-            scanf("%c", &method);
+            scanf("%c\n", &method);
             if (!is_valid_search_method(method)) {
                 printf("Unreconized option\n");
                 bad_option = true;
@@ -71,13 +72,18 @@ void get_gsdata_path(char *our_dir) {
         fprintf(config, "%c\n", method);
     }
 
-    gsdata_path = new_gsdat_path;
+    assets_path = new_assets_path;
     default_search_method = get_search_method(method);
     fclose(config);
 }
 
 void create_windows() {
-    initscr();
+    WINDOW *m = initscr();
+    if (!m) {
+        printf("Could not initialize ncurses, your terminal may not support it\n");
+        teardown();
+        exit(1);
+    }
     cbreak();
     noecho();
     nonl();
@@ -90,6 +96,7 @@ void create_windows() {
     if (maxx <= 30 || maxy <= 30)
 	{
 	    printf("Console window not large enough, aborting...\n");
+        teardown();
 	    exit(1);
 	}
     option_window = derwin(stdscr, 10, maxx, 0, 0);
@@ -112,7 +119,8 @@ void create_windows() {
 enum {
     SELECTING_CHAR,
     SELECTING_SKILL,
-    VIEWING_FRAMEDATA
+    VIEWING_FRAMEDATA,
+    COMPARING_CHARS
 } state;
 
 void start_mainloop() {
@@ -234,6 +242,8 @@ bool create_skill_name_search(void) {
 
 bool mainloop() {
     int last_key;
+    int opt_per_row = 5;
+    int row_spacing = 30;
     switch (state) {
         case SELECTING_CHAR:
             if (char_already_selected) {
@@ -265,8 +275,6 @@ bool mainloop() {
                 }
                 closedir(d);
             }
-            int opt_per_row = 4;
-            int row_spacing = 20;
             int selected_option = 0;
             wclear(option_window);
             selected_option = run_selection(option_window, opt_per_row, row_spacing, options, opt_count, selected_option);
@@ -295,19 +303,25 @@ bool mainloop() {
             return true;
             break;
         case VIEWING_FRAMEDATA:
-            create_formatted_skill_diplay(viewer_window, selected_skill_index, comp_fdata);
-            display_framedata(viewer_window, 5, 0, selected_skill_index, comp_fdata);
+        case COMPARING_CHARS:
+            if (state == VIEWING_FRAMEDATA) {
+                create_formatted_skill_diplay(viewer_window, selected_skill_index, comp_fdata);
+                display_framedata(viewer_window, 5, 0, selected_skill_index, comp_fdata);
+            } else {
+                create_and_display_char_deltas(viewer_window, selected_skill_index);
+            }
             wrefresh(viewer_window);
-            const int num_options = 4;
+            const int num_options = 5;
             char *myoptions[num_options];
             
             myoptions[0] = "Select new skill";
             myoptions[1] = "Select new character";
             myoptions[2] = "Select new skill and character";
-            myoptions[3] = "Quit";
+            myoptions[3] = "Compare across characters";
+            myoptions[4] = "Quit";
             selected_option = 0;
             wclear(option_window);
-            selected_option = run_selection(option_window, opt_per_row, 0, myoptions, num_options, selected_option);
+            selected_option = run_selection(option_window, opt_per_row, row_spacing, myoptions, num_options, selected_option);
             // create_selection(option_window, num_options, 0, myoptions, num_options, selected_option);
             // while ((last_key = getch()) != ' ') {
             //     if (last_key == ERR) continue;
@@ -315,6 +329,7 @@ bool mainloop() {
             //     if ((last_key == 's' || last_key == 'd') && selected_option < num_options) selected_option ++;
             //     create_selection(option_window, num_options, 0, myoptions, num_options, selected_option);
             // }
+            wclear(viewer_window);
             switch (selected_option) {
                 case 0:
                     state = SELECTING_SKILL;
@@ -330,6 +345,9 @@ bool mainloop() {
                     skill_already_selected = false;
                     return true;
                 case 3:
+                    state = COMPARING_CHARS;
+                    return true;
+                case 4:
                     return false;
             }
             break;
@@ -414,6 +432,7 @@ long get_fsize(FILE *f) {
 
 void teardown() {
     if (comp_fdata) free_complete_framedata(comp_fdata);
+    if (assets_path) free(assets_path);
     endwin();
 }
 
@@ -436,27 +455,112 @@ void create_fdata_diagram(WINDOW *window, int y, int x, float total_frames, uint
 }
 
 void display_framedata(WINDOW *window, int y, int x, uint32_t skill_index, complete_framedata *fdata) {
+    uint16_t g_prefab = get_prefab_for_skill(fdata, skill_index);
+    uint16_t g_anim = get_anim_for_prefab(fdata, g_prefab);
+    float g_dur = get_duration_for_anim(fdata, g_anim);
+    
+    uint16_t a_prefab = get_air_prefab_for_skill(fdata, skill_index);
+    uint16_t a_anim = get_anim_for_prefab(fdata, a_prefab);
+    float a_dur = get_duration_for_anim(fdata, a_anim);
+
+    display_framedata_ex(window, y, x, skill_index, fdata, (int)g_dur, (int)a_dur);
+}
+
+void display_framedata_ex(WINDOW *window, int y, int x, uint32_t skill_index, complete_framedata *fdata, int g_dur, int a_dur) {
     enum use_restrict use_res = get_use_restrict(fdata->gsdata, skill_index);
     void *curr_skill = (fdata->gsdata + 0x18 + skill_index * 0x90);
 
     if (use_res != AIR_ONLY) {
         uint16_t g_prefab = get_prefab_for_skill(fdata, skill_index);
         uint16_t g_anim = get_anim_for_prefab(fdata, g_prefab);
-        float g_total_frames = get_duration_for_anim(fdata, g_anim);
+        int g_total_frames = g_dur;
         uint16_t g_delay = get_delay_for_prefab(fdata, g_prefab);
         uint16_t g_active = get_melee_end_frame_for_prefab(fdata, g_prefab);
-        mvwprintw(window, y, x, "GROUNDED: Prefab %X, animation %X; Length: %f, Startup: %d, Recovery: %d, Active: %d", g_prefab, g_anim, g_total_frames, g_delay, (int)g_total_frames - g_delay, g_active);
+        mvwprintw(window, y, x, "GROUNDED: Prefab %X, animation %X; Length: %d, Startup: %d, Recovery: %d, Active Until: %d",
+            g_prefab, g_anim, g_total_frames, g_delay, g_total_frames - g_delay, g_active);
         create_fdata_diagram(window, y + 1, x, g_total_frames, g_delay, g_active);
         y += 3;
     }
     if (use_res != GROUND_ONLY) {
         uint16_t a_prefab = get_air_prefab_for_skill(fdata, skill_index);
         uint16_t a_anim = get_anim_for_prefab(fdata, a_prefab);
-        float a_total_frames = get_duration_for_anim(fdata, a_anim);
+        int a_total_frames = a_dur;
         uint16_t a_delay = get_delay_for_prefab(fdata, a_prefab);
         uint16_t a_active = get_melee_end_frame_for_prefab(fdata, a_prefab);
-        mvwprintw(window, y, x, "AIR: Prefab %X, animation %X; Length: %f, Startup: %d, Recovery: %d, Active: %d", a_prefab, a_anim, a_total_frames, a_delay, (int)a_total_frames - a_delay, a_active);
+        mvwprintw(window, y, x, "AIR: Prefab %X, animation %X; Length: %d, Startup: %d, Recovery: %d, Active Until: %d", 
+            a_prefab, a_anim, a_total_frames, a_delay, a_total_frames - a_delay, a_active);
         create_fdata_diagram(window, y + 1, x, a_total_frames, a_delay, a_active);
+    }
+}
+
+void create_and_display_char_deltas(WINDOW *window, uint32_t skill_index) {
+    const int max_datas = 7;
+    const int max_str_len = getmaxx(viewer_window) - 5;
+    char names[max_datas][max_str_len + 1];
+    int lens[max_datas][2];
+    memset(lens, 0, sizeof(lens));
+    int num_diff = 0;
+
+    uint16_t g_anim = get_anim_for_prefab(comp_fdata, get_prefab_for_skill(comp_fdata, skill_index));
+    bool has_air = get_use_restrict(comp_fdata->gsdata, skill_index);
+    uint16_t a_anim = has_air ? get_anim_for_prefab(comp_fdata, get_air_prefab_for_skill(comp_fdata, skill_index)) : 0;
+
+    char path[PATH_MAX];
+    snprintf(path, 0x40, "%s/", FDATA_PATH);
+    DIR *d = opendir(path);
+    struct dirent *dir;
+    size_t fdata_len = strlen(path);
+    struct stat file_stat;
+    if (d) {
+        while (dir = readdir(d)) {
+            strcpy(path + fdata_len, dir->d_name);
+            stat(path, &file_stat);
+            if (S_ISREG(file_stat.st_mode)) {
+                if (num_diff < max_datas) {
+                    load_durations_for_player(path, comp_fdata);
+                    bool same = false;
+                    int g_len = (int)get_duration_for_anim(comp_fdata, g_anim);
+                    int a_len = (int)get_duration_for_anim(comp_fdata, a_anim);
+                    for (int i = 0; i < num_diff; i ++) {
+                        if (lens[i][0] == g_len && (!has_air || lens[i][1] == a_len)) {
+                            size_t old_len = strlen(names[i]);
+                            size_t new_len = dir->d_namlen + strlen(names[i]) + 2;
+                            same = true;
+                            if (new_len > max_str_len) {
+                                if (old_len + 4 > max_str_len) memcpy(&names[i][old_len - 4], ",...", 5);
+                                else strcat(names[i], ",...");
+                            } else {
+                                strcat(names[i], ", ");
+                                strcat(names[i], dir->d_name);
+                            }
+                            break;
+                        }
+                    }
+                    if (!same) {
+                        strncpy(names[num_diff], dir->d_name, max_str_len);
+                        lens[num_diff][0] = g_len;
+                        lens[num_diff][1] = a_len;
+                        num_diff ++;
+                    }
+                }
+            }
+        }
+        closedir(d);
+        // for now just print
+        create_formatted_skill_diplay(viewer_window, skill_index, comp_fdata);
+        for (int i = 0; i < num_diff; i ++) {
+            int y = 7 * i + 4;
+            if (num_diff == 1)
+                mvwprintw(viewer_window, y, 0, "All:");
+            else
+                mvwprintw(viewer_window, y, 0, "%s:", names[i]);
+            display_framedata_ex(viewer_window, y + 1, 0, skill_index, comp_fdata, lens[i][0], lens[i][1]);
+        }
+        if (num_diff == max_datas) {
+            mvwprintw(viewer_window, 7 * max_datas + 4, 0, "== Too Many To Display ==");
+        }
+        wrefresh(viewer_window);
+        getch();
     }
 }
 
@@ -467,22 +571,41 @@ void display_framedata(WINDOW *window, int y, int x, uint32_t skill_index, compl
 complete_framedata *load_fdata_for_player(char *bin_fdata_path) {
     // time to do this the hard way
     // read all of gsdata into our buffer
+    char pathbuf[MAX_PATH];
     void *gsdata_buf = malloc(0x44803);
     if (!gsdata_buf) return NULL;
-    FILE *gsdat_file = fopen(gsdata_path, "rb");
+    strncpy(pathbuf, assets_path, MAX_PATH / 2);
+    strncat(pathbuf, GSDATA_REL_PATH, MAX_PATH / 2);
+    FILE *gsdat_file = fopen(pathbuf, "rb");
+    if (!gsdat_file) {
+        printf("Could not open gsdata file at path %s\nreason: \"%s\"\nquitting...\n", pathbuf, strerror(errno));
+        free(gsdata_buf);
+        teardown();
+        exit(-1);
+    }
     fread(gsdata_buf, 0x44004, 1, gsdat_file);
     fclose(gsdat_file);
 
     complete_framedata *fdat = calloc(1, sizeof(complete_framedata));
-    FILE *fdata_h = fopen(bin_fdata_path, "rb");
-    long fsize = get_fsize(fdata_h);
-    fdat->anim_to_duration = malloc(fsize);
-    fread(fdat->anim_to_duration, fsize, 1, fdata_h);
-    fclose(fdata_h);
+
+    if (!load_durations_for_player(bin_fdata_path, fdat)) return 0;
 
     fdat->gsdata = gsdata_buf;
 
     return fdat;
+}
+
+bool load_durations_for_player(char *bin_fdata_path, complete_framedata *fdat) {
+    if (!fdat) return false;
+
+    FILE *fdata_h = fopen(bin_fdata_path, "rb");
+    long fsize = get_fsize(fdata_h);
+    if (fdat->anim_to_duration) free(fdat->anim_to_duration);
+    fdat->anim_to_duration = malloc(fsize);
+    fread(fdat->anim_to_duration, fsize, 1, fdata_h);
+    fclose(fdata_h);
+
+    return true;
 }
 
 void free_complete_framedata(complete_framedata *fdat) {
